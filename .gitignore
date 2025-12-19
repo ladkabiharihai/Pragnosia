@@ -49,6 +49,9 @@ runs/
 # Data
 data/
 datasets/
+
+# But keep source code in src/pragnosia/data/
+!src/pragnosia/data/
 *.csv
 
 # Exclude training output configs but keep source configs
@@ -62,6 +65,14 @@ data/**/*.txt
 
 # Tensorboard
 events.out.tfevents.*
+
+# Training logs
+training_*.log
+*.log
+
+# Archives
+*.zip
+*.tar.gz
 
 # OS
 .DS_Store
