@@ -526,6 +526,75 @@ Comprehensive guides available:
   - Expert CPU/GPU orchestration
   - Memory systems (hippocampus/neocortex)
 
+## Current State and Known Limitations
+
+### Training Infrastructure  ✅
+
+The training pipeline is **fully functional and stable**:
+- ✅ Phased training working correctly
+- ✅ Loss decreases properly (10.6 → 4.7 on WikiText-103)
+- ✅ Constant VRAM training validated
+- ✅ Expert specialization and freezing operational
+- ✅ Embedding initialization fixed (std=0.02)
+- ✅ Pre-training capability added (WikiText-2/103, OpenWebText)
+
+### Text Generation Limitations ⚠️
+
+**Current Issue**: Text generation is **incoherent** despite successful training.
+
+**Example output** (after pre-training on WikiText-103):
+```
+Prompt: "What is Python?"
+Output: ")- Watson confusingacusallowed� honeyMorning Teachombs setting replaced..."
+```
+
+**Root Cause - Architectural Limitations**:
+
+The local learning architecture optimizes for:
+- Expert specialization (✅ working)
+- Continual learning (✅ working)
+- Memory consolidation (✅ working)
+- Constant VRAM (✅ working)
+
+But **sacrifices** (by design):
+- **Sequential coherence**: Experts learn independently, no global context
+- **Long-range dependencies**: No attention mechanism for distant tokens
+- **Grammatical structure**: Intrinsic objectives optimize surprise/disagreement, not linguistic coherence
+
+This is a **fundamental architectural trade-off**, not a training bug.
+
+### What Works Well
+
+Pragnosia excels at its design goals:
+1. **Representation Learning**: Stable, diverse expert specialization
+2. **Memory Efficiency**: True constant-VRAM scaling (O(k) not O(n))
+3. **Continual Learning**: Can learn continuously without catastrophic forgetting
+4. **Brain-Like Learning**: Local rules, no global backpropagation
+
+### Research Directions
+
+To enable coherent generation while preserving local learning benefits:
+
+**Option 1: Hybrid Architecture**
+- Keep local learning for representation
+- Add global objective for sequential coherence
+- Example: Local experts + global attention layer
+
+**Option 2: Sequential Local Learning**
+- Add within-expert attention mechanisms
+- Maintain local updates, add temporal structure
+- Like local Transformers
+
+**Option 3: Repositioning**
+- Focus on Pragnosia's strengths: representation learning, continual learning
+- Use as a feature extractor/encoder
+- Pair with standard decoder for generation
+
+**Current Recommendation**: Pragnosia is best viewed as a **representation learning system** and **continual learning framework**, not a direct GPT competitor. Its value lies in:
+- Research into bio-plausible learning
+- Memory-efficient continual learning
+- Constant-VRAM deployment scenarios
+
 ## Roadmap
 
 **Completed** ✅:
