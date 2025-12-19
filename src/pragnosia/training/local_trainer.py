@@ -101,6 +101,20 @@ class LocalLearningTrainer:
             lr=config.learning_rate * 2.0,  # Can be more aggressive since it's just readout
         )
 
+        # Coherence Module optimizer (NEW: global learning for sequential binding)
+        # This module uses standard backprop + cross-entropy
+        # Learns to bind locally-learned representations into coherent sequences
+        if hasattr(self.model, 'coherence') and self.model.coherence is not None:
+            self.coherence_optimizer = torch.optim.Adam(
+                self.model.coherence.parameters(),
+                lr=config.learning_rate,  # Same as embeddings
+                weight_decay=0.01,  # Slight regularization for transformer
+            )
+            print(f"🔗 Coherence optimizer initialized (global learning enabled)")
+        else:
+            self.coherence_optimizer = None
+            print(f"⚠️  No coherence optimizer (global learning disabled)")
+
         # VRAM tracking
         self.vram_history = []
         self.vram_tracking_enabled = torch.cuda.is_available()
@@ -525,6 +539,10 @@ class LocalLearningTrainer:
                 # Position embeddings are trained separately in Step 3 (context direction).
                 self.lm_head_optimizer.zero_grad()
 
+                # Zero gradients for coherence module (global learning)
+                if self.coherence_optimizer is not None:
+                    self.coherence_optimizer.zero_grad()
+
                 # Reuse the combined expert output from earlier
                 # (It's still in memory from Step 2, but detached from computation graph)
                 # We'll work with the cached expert outputs to avoid recomputing
@@ -550,8 +568,20 @@ class LocalLearningTrainer:
                 # Combine expert outputs (all detached, no grad flow to experts or embeddings)
                 combined_expert_output = torch.stack(expert_outputs_fresh).mean(dim=0)
 
-                # Forward through LM head (WITH gradients for head)
-                lm_head_logits = self.model.output_head(combined_expert_output)
+                # Apply coherence module if available (WITH gradients for coherence)
+                # This is where local representations get bound into coherent sequences
+                if self.model.use_coherence and self.model.coherence is not None:
+                    # Create attention mask (assuming no padding for now)
+                    attention_mask = None  # Could add padding mask here if needed
+
+                    # Apply coherence (enables global learning via self-attention)
+                    final_output = self.model.coherence(combined_expert_output, attention_mask)
+                else:
+                    # No coherence - use raw expert output
+                    final_output = combined_expert_output
+
+                # Forward through LM head (WITH gradients for head and coherence)
+                lm_head_logits = self.model.output_head(final_output)
 
                 # CLEAN supervised cross-entropy loss
                 # NO frequency weighting here - output head must learn TRUE distribution
@@ -565,9 +595,9 @@ class LocalLearningTrainer:
                     reduction='mean',
                 )
 
-                # Backward through LM head (and token_embedding via weight tying)
-                # Since combined_expert_output is detached, gradients only flow to output_head
-                # But output_head.weight IS token_embedding.weight, so token embeddings get updated too
+                # Backward through LM head, coherence, and token_embedding
+                # Gradients flow: output_head <- coherence <- [STOP at detached expert output]
+                # Also: output_head.weight IS token_embedding.weight (weight tying)
                 lm_head_loss.backward()
 
                 # Gradient clipping for LM head (includes token_embedding via weight tying)
@@ -576,8 +606,19 @@ class LocalLearningTrainer:
                     self.config.gradient_clip_val,
                 )
 
+                # Gradient clipping for coherence module (if enabled)
+                if self.coherence_optimizer is not None:
+                    torch.nn.utils.clip_grad_norm_(
+                        self.model.coherence.parameters(),
+                        self.config.gradient_clip_val,
+                    )
+
                 # Update LM head + token embeddings (via weight tying)
                 self.lm_head_optimizer.step()
+
+                # Update coherence module (global learning via backprop)
+                if self.coherence_optimizer is not None:
+                    self.coherence_optimizer.step()
 
                 # STEP 5: Update router using Hebbian rule (no gradients needed)
                 # Router learns to select experts that reduce error

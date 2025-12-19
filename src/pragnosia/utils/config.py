@@ -86,6 +86,12 @@ class PragnosiaConfig:
     vision_encoder: str = "openai/clip-vit-base-patch32"
     audio_encoder: str = "openai/whisper-tiny"
 
+    # Coherence module (hybrid local-global architecture)
+    use_coherence_module: bool = True  # Enable global coherence via self-attention
+    coherence_num_layers: int = 2  # Number of transformer layers (2-4 recommended)
+    coherence_num_heads: int = 8  # Number of attention heads
+    coherence_dropout: float = 0.1  # Dropout in coherence module
+
     def __post_init__(self):
         """Validate configuration."""
         assert 0 < self.exploration_end < 1, "exploration_end must be in (0, 1)"

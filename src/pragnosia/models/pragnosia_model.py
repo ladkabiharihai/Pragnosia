@@ -7,6 +7,7 @@ import threading
 from ..utils.config import PragnosiaConfig
 from .router import HebbianRouter
 from .expert import ExpertModule
+from .coherence_module import CoherenceModule
 from ..memory.hippocampus import Hippocampus
 from ..memory.neocortex import Neocortex
 from ..losses.intrinsic import IntrinsicObjective
@@ -105,6 +106,22 @@ class PragnosiaModel(nn.Module):
             target_entropy=config.target_entropy,
         )
 
+        # COHERENCE MODULE (NEW): Lightweight transformer for sequential binding
+        # This is the key innovation that enables coherent generation
+        # while preserving local learning in experts
+        self.use_coherence = getattr(config, 'use_coherence_module', True)
+        if self.use_coherence:
+            self.coherence = CoherenceModule(
+                hidden_size=config.hidden_size,
+                num_layers=getattr(config, 'coherence_num_layers', 2),
+                num_heads=getattr(config, 'coherence_num_heads', 4),
+                dropout=getattr(config, 'coherence_dropout', 0.1),
+            )
+            print(f"🔗 Coherence Module enabled: {self.coherence.get_memory_size_mb():.1f} MB")
+        else:
+            self.coherence = None
+            print("⚠️  Coherence Module disabled - generation may be incoherent")
+
         # Output head
         self.output_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
 
@@ -191,8 +208,26 @@ class PragnosiaModel(nn.Module):
         else:
             combined_output = sum(expert_outputs) / len(expert_outputs)
 
-        # Generate predictions
-        logits = self.output_head(combined_output)
+        # APPLY COHERENCE MODULE (if enabled)
+        # This is where local representations get bound into coherent sequences
+        if self.use_coherence and self.coherence is not None:
+            # Create attention mask from input_ids (1 for real tokens, 0 for padding)
+            if hasattr(self.token_embedding, 'padding_idx') and self.token_embedding.padding_idx is not None:
+                attention_mask = (input_ids != self.token_embedding.padding_idx).long()
+            else:
+                attention_mask = None
+
+            # Apply coherence (global learning via self-attention)
+            coherent_output = self.coherence(combined_output, attention_mask)
+
+            # Use coherent output for final predictions
+            final_output = coherent_output
+        else:
+            # No coherence - use raw expert output (may be incoherent)
+            final_output = combined_output
+
+        # Generate predictions from coherent (or raw) representations
+        logits = self.output_head(final_output)
 
         # Compute losses if labels provided
         total_loss = None
@@ -287,10 +322,12 @@ class PragnosiaModel(nn.Module):
             total_loss = intrinsic_loss + homeostatic_loss
 
             # Update router with Hebbian learning
+            # Use final output (after coherence) for error computation
+            # This aligns routing with actual model performance
             expert_errors = self._compute_expert_errors(
                 expert_outputs,
                 labels,
-                combined_output,
+                final_output,
             )
             self.router.hebbian_update(features, expert_errors)
 
@@ -322,13 +359,14 @@ class PragnosiaModel(nn.Module):
                 "loss": eval_loss,
                 "intrinsic_loss": None,
                 "homeostatic_loss": None,
-                "hidden_states": combined_output.detach(),
+                "hidden_states": final_output.detach(),  # Return coherent output
                 "routing_stats": {"selected_experts": selected_expert_ids},
             }
 
         # Update previous hidden for temporal consistency (training only)
+        # Use coherent output for temporal tracking if available
         if not inference_mode:
-            self.prev_hidden = combined_output.detach()
+            self.prev_hidden = final_output.detach()
 
         # Gather routing statistics
         routing_stats = self.router.check_stability()
@@ -342,7 +380,7 @@ class PragnosiaModel(nn.Module):
             "loss": total_loss,
             "intrinsic_loss": intrinsic_loss,
             "homeostatic_loss": homeostatic_loss,
-            "hidden_states": combined_output,
+            "hidden_states": final_output,  # Return coherent representations
             "routing_stats": routing_stats,
         }
 
@@ -372,17 +410,20 @@ class PragnosiaModel(nn.Module):
         self,
         expert_outputs: List[torch.Tensor],
         labels: torch.Tensor,
-        combined_output: torch.Tensor,
+        final_output: torch.Tensor,
     ) -> torch.Tensor:
         """
         Compute error reduction for each expert for Hebbian updates.
+
+        Note: Uses final coherent output as baseline (after coherence module)
+        This ensures Hebbian updates align with actual model performance.
 
         Returns tensor of error reductions (negative = improvement).
         """
         expert_errors = torch.zeros(self.config.num_experts, device=labels.device)
 
-        # Compute baseline error (combined output)
-        baseline_logits = self.output_head(combined_output)
+        # Compute baseline error (final coherent output)
+        baseline_logits = self.output_head(final_output)
         baseline_loss = torch.nn.functional.cross_entropy(
             baseline_logits.view(-1, baseline_logits.size(-1)),
             labels.view(-1),

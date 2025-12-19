@@ -201,7 +201,8 @@ class HebbianRouter(nn.Module):
             # Normalize routing scores to prevent drift, but maintain diversity
             # Use temperature to control concentration
             temperature = 0.5  # Lower = more diverse, higher = more concentrated
-            self.routing_scores = F.softmax(self.routing_scores / temperature, dim=0)
+            normalized_scores = F.softmax(self.routing_scores / temperature, dim=0)
+            self.routing_scores.data.copy_(normalized_scores)
 
     def _compute_entropy(self, activations: torch.Tensor) -> torch.Tensor:
         """Compute Shannon entropy of expert activations."""

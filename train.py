@@ -447,8 +447,19 @@ def main():
     print(f"Offload to CPU: {args.offload_to_cpu}")
     print("="*80)
 
-    # Setup configuration
-    config = setup_config(args)
+    # Load checkpoint if resuming (to get the correct config)
+    if args.resume:
+        print(f"\nLoading checkpoint for config: {args.resume}")
+        checkpoint = torch.load(args.resume, map_location=args.device, weights_only=False)
+        if "config" in checkpoint:
+            config = checkpoint["config"]
+            print("Using config from checkpoint")
+        else:
+            print("Warning: No config in checkpoint, using default config")
+            config = setup_config(args)
+    else:
+        # Setup configuration
+        config = setup_config(args)
 
     # Save configuration
     save_training_config(args, config, output_dir)
@@ -489,10 +500,9 @@ def main():
         local_learning_rate=args.local_learning_rate,
     )
 
-    # Resume from checkpoint if specified
+    # Load weights from checkpoint if resuming
     if args.resume:
-        print(f"\nResuming from checkpoint: {args.resume}")
-        checkpoint = torch.load(args.resume, map_location=args.device, weights_only=False)
+        print(f"\nLoading weights from checkpoint...")
         model.load_state_dict(checkpoint["model_state_dict"])
         print("Checkpoint loaded successfully")
 
