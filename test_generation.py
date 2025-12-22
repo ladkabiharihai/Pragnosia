@@ -36,13 +36,33 @@ print("\n" + "="*80)
 print("GENERATION TESTS")
 print("="*80)
 
+# System prompt (matches training format)
+SYSTEM_PROMPT = """You are Pragnosia, an advanced AI assistant built on a novel hybrid local-global learning architecture. You combine brain-inspired local learning with transformer-based coherence to provide helpful, accurate, and nuanced responses.
+
+Key characteristics:
+- You are knowledgeable, helpful, and honest
+- You admit when you don't know something
+- You provide clear, well-structured responses
+- You can help with chat, code, reasoning, and general questions
+- You are named Pragnosia (from "pragma" meaning practical knowledge)
+
+Respond naturally and helpfully to user queries."""
+
 for prompt in prompts:
     print(f"\n{'='*80}")
     print(f"Prompt: {prompt}")
     print(f"{'-'*80}")
 
-    # Format as instruction
-    formatted_prompt = f"### Instruction:\n{prompt}\n\n### Response:\n"
+    # Format as instruction (MUST match training format)
+    # Note: Exactly ONE newline after "### Assistant:" to match training
+    formatted_prompt = f"""### System:
+{SYSTEM_PROMPT.strip()}
+
+### User:
+{prompt}
+
+### Assistant:
+"""
 
     # Tokenize
     inputs = tokenizer(
@@ -68,8 +88,8 @@ for prompt in prompts:
             # Get next token (SAMPLING with temperature)
             next_token_logits = logits[0, -1, :]
 
-            # Apply temperature
-            temperature = 0.8
+            # Apply temperature (lower = more deterministic)
+            temperature = 0.1  # Very low temperature for more focused generation
             next_token_logits = next_token_logits / temperature
 
             # Apply top-p filtering
@@ -78,7 +98,9 @@ for prompt in prompts:
             sorted_indices_to_remove = cumulative_probs > 0.9
             sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
             sorted_indices_to_remove[..., 0] = 0
-            indices_to_remove = sorted_indices[sorted_indices_to_remove]
+            # Scatter sorted boolean mask back to original token order
+            indices_to_remove = torch.zeros_like(next_token_logits, dtype=torch.bool)
+            indices_to_remove.scatter_(dim=0, index=sorted_indices, src=sorted_indices_to_remove)
             next_token_logits[indices_to_remove] = float('-inf')
 
             # Sample

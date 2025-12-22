@@ -8,6 +8,7 @@ from ..utils.config import PragnosiaConfig
 from .router import HebbianRouter
 from .expert import ExpertModule
 from .coherence_module import CoherenceModule
+from .enhanced_coherence import EnhancedCoherenceModule
 from ..memory.hippocampus import Hippocampus
 from ..memory.neocortex import Neocortex
 from ..losses.intrinsic import IntrinsicObjective
@@ -106,18 +107,31 @@ class PragnosiaModel(nn.Module):
             target_entropy=config.target_entropy,
         )
 
-        # COHERENCE MODULE (NEW): Lightweight transformer for sequential binding
+        # COHERENCE MODULE: Powerful transformer for sequential binding
         # This is the key innovation that enables coherent generation
         # while preserving local learning in experts
         self.use_coherence = getattr(config, 'use_coherence_module', True)
+        use_enhanced = getattr(config, 'use_enhanced_coherence', True)
+
         if self.use_coherence:
-            self.coherence = CoherenceModule(
-                hidden_size=config.hidden_size,
-                num_layers=getattr(config, 'coherence_num_layers', 2),
-                num_heads=getattr(config, 'coherence_num_heads', 4),
-                dropout=getattr(config, 'coherence_dropout', 0.1),
-            )
-            print(f"🔗 Coherence Module enabled: {self.coherence.get_memory_size_mb():.1f} MB")
+            if use_enhanced:
+                # ENHANCED coherence for proper chat and code generation
+                self.coherence = EnhancedCoherenceModule(
+                    hidden_size=config.hidden_size,
+                    num_layers=getattr(config, 'coherence_num_layers', 8),  # Default: 8 layers
+                    num_heads=getattr(config, 'coherence_num_heads', 8),    # Default: 8 heads
+                    dropout=getattr(config, 'coherence_dropout', 0.1),
+                    use_kv_cache=True,  # Enable fast generation
+                )
+            else:
+                # Original lightweight coherence
+                self.coherence = CoherenceModule(
+                    hidden_size=config.hidden_size,
+                    num_layers=getattr(config, 'coherence_num_layers', 2),
+                    num_heads=getattr(config, 'coherence_num_heads', 4),
+                    dropout=getattr(config, 'coherence_dropout', 0.1),
+                )
+                print(f"🔗 Coherence Module enabled: {self.coherence.get_memory_size_mb():.1f} MB")
         else:
             self.coherence = None
             print("⚠️  Coherence Module disabled - generation may be incoherent")
@@ -218,7 +232,9 @@ class PragnosiaModel(nn.Module):
                 attention_mask = None
 
             # Apply coherence (global learning via self-attention)
-            coherent_output = self.coherence(combined_output, attention_mask)
+            # In inference mode, use KV cache for fast generation
+            use_cache = inference_mode and seq_len == 1
+            coherent_output = self.coherence(combined_output, attention_mask, use_cache=use_cache)
 
             # Use coherent output for final predictions
             final_output = coherent_output
@@ -479,6 +495,109 @@ class PragnosiaModel(nn.Module):
             with self.consolidation_lock:
                 self.neocortex.consolidate(candidates)
                 self.hippocampus.clear_consolidated(candidates)
+
+    @torch.no_grad()
+    def generate(
+        self,
+        input_ids: torch.Tensor,
+        max_new_tokens: int = 100,
+        temperature: float = 1.0,
+        top_k: int = 50,
+        top_p: float = 0.9,
+        do_sample: bool = True,
+        pad_token_id: Optional[int] = None,
+        eos_token_id: Optional[int] = None,
+        repetition_penalty: float = 1.2,
+    ) -> torch.Tensor:
+        """
+        Generate text autoregressively with enhanced coherence.
+
+        Args:
+            input_ids: Input token IDs [batch_size, seq_len]
+            max_new_tokens: Maximum number of tokens to generate
+            temperature: Sampling temperature (higher = more random)
+            top_k: Keep only top k tokens for sampling
+            top_p: Nucleus sampling - keep tokens with cumulative probability <= top_p
+            do_sample: Whether to sample (True) or use greedy decoding (False)
+            pad_token_id: Padding token ID
+            eos_token_id: End-of-sequence token ID
+            repetition_penalty: Penalty for repeating tokens (>1.0 = discourage repetition)
+
+        Returns:
+            Generated token IDs [batch_size, seq_len + max_new_tokens]
+        """
+        self.eval()
+
+        # Clear KV cache if using enhanced coherence
+        if self.use_coherence and hasattr(self.coherence, 'clear_cache'):
+            self.coherence.clear_cache()
+
+        generated = input_ids.clone()
+
+        # Track token counts for repetition penalty
+        token_counts = {}
+
+        for _ in range(max_new_tokens):
+            # Forward pass
+            outputs = self.forward(generated, inference_mode=True)
+            logits = outputs["logits"]
+
+            # Get logits for last token
+            next_token_logits = logits[:, -1, :]  # [batch_size, vocab_size]
+
+            # Apply repetition penalty
+            if repetition_penalty != 1.0:
+                for token_id, count in token_counts.items():
+                    # Penalize repeated tokens (divide if positive logit, multiply if negative)
+                    if next_token_logits[0, token_id] > 0:
+                        next_token_logits[0, token_id] /= (repetition_penalty ** count)
+                    else:
+                        next_token_logits[0, token_id] *= (repetition_penalty ** count)
+
+            # Apply temperature
+            if temperature != 1.0:
+                next_token_logits = next_token_logits / temperature
+
+            if do_sample:
+                # Top-k filtering
+                if top_k > 0:
+                    indices_to_remove = next_token_logits < torch.topk(next_token_logits, top_k)[0][..., -1, None]
+                    next_token_logits[indices_to_remove] = float('-inf')
+
+                # Top-p (nucleus) filtering
+                if top_p < 1.0:
+                    sorted_logits, sorted_indices = torch.sort(next_token_logits, descending=True)
+                    cumulative_probs = torch.cumsum(torch.softmax(sorted_logits, dim=-1), dim=-1)
+
+                    # Remove tokens with cumulative probability above the threshold
+                    sorted_indices_to_remove = cumulative_probs > top_p
+                    # Shift the indices to the right to keep also the first token above the threshold
+                    sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
+                    sorted_indices_to_remove[..., 0] = 0
+
+                    # Scatter sorted tensors to original indexing
+                    indices_to_remove = sorted_indices_to_remove.scatter(1, sorted_indices, sorted_indices_to_remove)
+                    next_token_logits[indices_to_remove] = float('-inf')
+
+                # Sample from the filtered distribution
+                probs = torch.softmax(next_token_logits, dim=-1)
+                next_token = torch.multinomial(probs, num_samples=1)
+            else:
+                # Greedy decoding
+                next_token = torch.argmax(next_token_logits, dim=-1, keepdim=True)
+
+            # Append to generated sequence
+            generated = torch.cat([generated, next_token], dim=-1)
+
+            # Update token counts for repetition penalty
+            token_id = next_token[0, 0].item()
+            token_counts[token_id] = token_counts.get(token_id, 0) + 1
+
+            # Stop if EOS token is generated
+            if eos_token_id is not None and (next_token == eos_token_id).all():
+                break
+
+        return generated
 
     def get_memory_statistics(self) -> Dict[str, any]:
         """Get comprehensive memory statistics."""

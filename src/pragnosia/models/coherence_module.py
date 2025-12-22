@@ -215,6 +215,7 @@ class CoherenceModule(nn.Module):
         self,
         expert_outputs: torch.Tensor,
         attention_mask: Optional[torch.Tensor] = None,
+        use_cache: bool = False,  # For compatibility with EnhancedCoherenceModule
     ) -> torch.Tensor:
         """
         Bind expert outputs into coherent sequences.
@@ -224,6 +225,7 @@ class CoherenceModule(nn.Module):
                 Combined output from experts (learned locally)
             attention_mask: (batch, seq_len)
                 1 for real tokens, 0 for padding
+            use_cache: Ignored (for compatibility with enhanced module)
 
         Returns:
             coherent_outputs: (batch, seq_len, hidden_size)

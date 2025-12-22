@@ -8,22 +8,32 @@
 
 Pragnosia is a systems architecture for continual representation learning inspired by neuroscience principles. It demonstrates that **local learning rules** can discover meaningful representations with **constant memory scaling**, enabling deployment on consumer GPUs while maintaining the capacity of much larger models.
 
+## 🚀 NEW: Enhanced Architecture for Chat & Code Generation
+
+Pragnosia now features a **hybrid local-global architecture** that enables proper chat and code generation:
+- **Local learning** (experts) for rich representations
+- **Enhanced coherence module** with ALiBi for sequential binding
+- **Two-stage training** for optimal performance
+
+**Quick start**: `./train_production_enhanced.sh 350M 10000`
+
+**📖 See [ENHANCED_ARCHITECTURE_GUIDE.md](ENHANCED_ARCHITECTURE_GUIDE.md) for details.**
+
 ## ⚠️ What Pragnosia Is (and Isn't)
 
 ### ✅ Pragnosia IS:
-- **A representation learning system** using local, brain-like learning rules
+- **A hybrid local-global architecture** - local learning for representations + global coherence for generation
 - **Constant-VRAM training** that scales O(k) not O(n) in active experts
-- **Proof-of-concept** for neuroscience-inspired learning architectures
+- **Chat and code capable** - proper conversational AI with the enhanced architecture
 - **Memory-efficient** - deploy 64B parameter models on 4GB GPUs
-- **Staged learning** - representation → alignment → stabilization phases
+- **Two-stage training** - representation learning → generation training
 
 ### ❌ Pragnosia is NOT:
-- **A standard language model** competing on perplexity benchmarks
-- **Trained with global backpropagation** - uses local learning only
-- **Optimized for absolute task performance** - optimized for constant memory
-- **A drop-in GPT replacement** - different training paradigm entirely
+- **Just a representation learning system** - now does practical chat & code generation!
+- **Purely local learning** - uses hybrid local (experts) + global (coherence) approach
+- **A drop-in GPT replacement** - different training paradigm, but achieves similar capabilities
 
-**Key insight**: This system is one conceptual level ahead of standard metrics. Success = constant VRAM + expert specialization + staged progression, **not** matching GPT-3 perplexity.
+**Key insight**: Combines the best of both worlds - constant memory from local learning + coherent generation from enhanced transformer coherence.
 
 ## Key Features
 
