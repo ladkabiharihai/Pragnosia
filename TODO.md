@@ -69,8 +69,8 @@ Brain-inspired, energy-efficient, modular multimodal LLM targeting 4GB GPU infer
   - [x] MLP connector for image tokens
   - [ ] Image-text alignment training
 
-- [ ] **Scaling**
-  - [ ] Scale to 3-7B total parameters
+- [x] **Scaling**
+  - [x] Scale to 3-7B total parameters (config_3b, config_7b)
   - [x] LoRA adapter implementation
   - [x] Memory expert for long context
 
@@ -97,10 +97,10 @@ Brain-inspired, energy-efficient, modular multimodal LLM targeting 4GB GPU infer
   - [x] Fine-tuning pipeline
   - [ ] Distributed training support (optional)
 
-- [ ] **Evaluation**
-  - [ ] Benchmark suite setup
+- [x] **Evaluation**
+  - [x] Benchmark suite setup
   - [ ] Comparison vs GPT-OSS-20B tasks
-  - [ ] Memory/inference profiling
+  - [x] Memory/inference profiling
 
 - [x] **Release**
   - [ ] Quantized model weights

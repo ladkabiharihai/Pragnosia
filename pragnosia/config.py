@@ -163,3 +163,65 @@ class PragnosiaConfig:
             num_experts=16,
             num_experts_per_token=2,
         )
+
+    @classmethod
+    def xl(cls) -> "PragnosiaConfig":
+        """XL config (~7B active, ~14B total with MoE)."""
+        return cls(
+            hidden_size=4096,
+            intermediate_size=11008,
+            num_hidden_layers=32,
+            num_attention_heads=32,
+            num_key_value_heads=8,
+            num_experts=16,
+            num_experts_per_token=2,
+            max_position_embeddings=8192,
+        )
+
+    @classmethod
+    def config_3b(cls) -> "PragnosiaConfig":
+        """3B total parameters config (optimized for 4GB GPU with offload)."""
+        return cls(
+            hidden_size=2560,
+            intermediate_size=6912,
+            num_hidden_layers=28,
+            num_attention_heads=20,
+            num_key_value_heads=4,
+            num_experts=8,
+            num_experts_per_token=2,
+            use_gradient_checkpointing=True,
+            use_cpu_offload=True,
+        )
+
+    @classmethod
+    def config_7b(cls) -> "PragnosiaConfig":
+        """7B total parameters config (requires offload or quantization)."""
+        return cls(
+            hidden_size=4096,
+            intermediate_size=11008,
+            num_hidden_layers=32,
+            num_attention_heads=32,
+            num_key_value_heads=8,
+            num_experts=8,
+            num_experts_per_token=2,
+            use_gradient_checkpointing=True,
+            use_cpu_offload=True,
+            load_in_4bit=True,
+        )
+
+    @classmethod
+    def efficient_4gb(cls) -> "PragnosiaConfig":
+        """Config optimized for inference on 4GB GPU."""
+        return cls(
+            hidden_size=1536,
+            intermediate_size=4096,
+            num_hidden_layers=20,
+            num_attention_heads=12,
+            num_key_value_heads=4,
+            num_experts=8,
+            num_experts_per_token=1,  # Single expert for efficiency
+            use_gradient_checkpointing=True,
+            use_flash_attention=True,
+            enable_energy_gating=True,
+            energy_budget_default=0.7,  # Reduced compute
+        )
