@@ -20,6 +20,21 @@ from pragnosia.modules.embeddings import RotaryEmbedding
 from pragnosia.modules.transformer import PragnosiaBlock, PragnosiaTransformer
 from pragnosia.modules.cortex import InputRouter, TextCortex, VisionCortex, OutputCortex
 from pragnosia.modules.plasticity import PlasticityEngine
+from pragnosia.modules.lora import (
+    LoRALinear,
+    LoRAConfig,
+    apply_lora,
+    get_lora_state_dict,
+    load_lora_state_dict,
+    merge_lora_weights,
+    unmerge_lora_weights,
+    count_lora_parameters,
+)
+from pragnosia.modules.memory_expert import (
+    MemoryExpert,
+    MemoryState,
+    MemoryAugmentedTransformerBlock,
+)
 
 __all__ = [
     "PragnosiaAttention",
@@ -36,4 +51,15 @@ __all__ = [
     "VisionCortex",
     "OutputCortex",
     "PlasticityEngine",
+    "LoRALinear",
+    "LoRAConfig",
+    "apply_lora",
+    "get_lora_state_dict",
+    "load_lora_state_dict",
+    "merge_lora_weights",
+    "unmerge_lora_weights",
+    "count_lora_parameters",
+    "MemoryExpert",
+    "MemoryState",
+    "MemoryAugmentedTransformerBlock",
 ]

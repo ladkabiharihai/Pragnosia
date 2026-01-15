@@ -71,8 +71,8 @@ Brain-inspired, energy-efficient, modular multimodal LLM targeting 4GB GPU infer
 
 - [ ] **Scaling**
   - [ ] Scale to 3-7B total parameters
-  - [ ] LoRA adapter implementation
-  - [ ] Memory expert for long context
+  - [x] LoRA adapter implementation
+  - [x] Memory expert for long context
 
 - [x] **Text Cortex Refinement**
   - [x] Basic tokenization support
@@ -146,7 +146,7 @@ Brain-inspired, energy-efficient, modular multimodal LLM targeting 4GB GPU infer
 - [x] ZeRO/Accelerate sharding support
 - [x] 4-bit quantization (bitsandbytes)
 - [x] Gradient checkpointing
-- [ ] LoRA adapters
+- [x] LoRA adapters
 - [x] Dynamic plasticity (grow/prune)
 - [x] Energy-aware computation
 
@@ -154,7 +154,7 @@ Brain-inspired, energy-efficient, modular multimodal LLM targeting 4GB GPU infer
 
 ## Test Coverage
 
-- 57 tests passing
+- 86 tests passing
 - Tests cover:
   - All core modules (attention, MLP, normalization)
   - MoE routing and expert selection
@@ -163,6 +163,8 @@ Brain-inspired, energy-efficient, modular multimodal LLM targeting 4GB GPU infer
   - Full model forward/backward pass
   - Text generation
   - GPU compatibility
+  - LoRA adapters and fine-tuning
+  - Memory expert for long context
 
 ---
 
