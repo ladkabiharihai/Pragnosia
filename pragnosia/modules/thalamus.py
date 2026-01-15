@@ -112,8 +112,8 @@ class ThalamusRouter(nn.Module):
             router_logits, effective_top_k, dim=-1
         )  # [batch, seq_len, top_k]
 
-        # Normalize weights (softmax over selected experts)
-        routing_weights = F.softmax(routing_weights, dim=-1)
+        # Normalize weights (softmax over selected experts in float32 for stability)
+        routing_weights = F.softmax(routing_weights.float(), dim=-1).to(router_logits.dtype)
 
         # Create dispatch mask
         expert_mask = torch.zeros_like(router_logits)
@@ -131,8 +131,8 @@ class ThalamusRouter(nn.Module):
 
         Encourages even distribution of tokens across experts.
         """
-        # Average routing probability per expert
-        router_probs = F.softmax(router_logits, dim=-1)
+        # Average routing probability per expert (compute in float32)
+        router_probs = F.softmax(router_logits.float(), dim=-1)
         avg_probs = router_probs.mean(dim=[0, 1])  # [num_experts]
 
         # Fraction of tokens routed to each expert
@@ -221,9 +221,9 @@ class ThalamusRouter(nn.Module):
         # Update activation statistics
         self._update_activation_stats(expert_indices, self.training)
 
-        # Create combine weights tensor
+        # Create combine weights tensor (ensure same dtype as routing_weights)
         combine_weights = torch.zeros_like(router_logits)
-        combine_weights.scatter_(-1, expert_indices, routing_weights)
+        combine_weights.scatter_(-1, expert_indices, routing_weights.to(combine_weights.dtype))
 
         return RouterOutput(
             dispatch_mask=expert_mask,
