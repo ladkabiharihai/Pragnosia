@@ -85,16 +85,16 @@ Brain-inspired, energy-efficient, modular multimodal LLM targeting 4GB GPU infer
 ## Week 4 - Data, Training & Evaluation
 **Goal:** Open-source Pragnosia v0.1 with reproducible 4GB pipeline
 
-- [ ] **Data Pipeline**
-  - [ ] Dataset preprocessing scripts
-  - [ ] GneissWeb integration
-  - [ ] OpenWebMath for reasoning
-  - [ ] The Stack V2 for coding
-  - [ ] COCO/LAION for multimodal
+- [x] **Data Pipeline**
+  - [x] Dataset preprocessing scripts
+  - [x] HuggingFace dataset integration
+  - [x] OpenWebMath for reasoning
+  - [x] The Stack V2 for coding
+  - [x] COCO/LAION for multimodal
 
-- [ ] **Training**
-  - [ ] Curriculum training implementation
-  - [ ] Fine-tuning pipeline
+- [x] **Training**
+  - [x] Curriculum training implementation
+  - [x] Fine-tuning pipeline
   - [ ] Distributed training support (optional)
 
 - [ ] **Evaluation**
