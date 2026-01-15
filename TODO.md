@@ -87,8 +87,9 @@ Brain-inspired, energy-efficient, modular multimodal LLM targeting 4GB GPU infer
 
 - [ ] **Data Pipeline**
   - [ ] Dataset preprocessing scripts
-  - [ ] FineWeb-Edu integration
+  - [ ] GneissWeb integration
   - [ ] OpenWebMath for reasoning
+  - [ ] The Stack V2 for coding
   - [ ] COCO/LAION for multimodal
 
 - [ ] **Training**
